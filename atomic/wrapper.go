@@ -5,6 +5,7 @@ import "hash/fnv"
 
 import "github.com/syndtr/goleveldb/leveldb"
 import "github.com/syndtr/goleveldb/leveldb/opt"
+import "github.com/syndtr/goleveldb/leveldb/util"
 
 const DEFAULT_NUM_BUCKETS = 16
 const DEFAULT_BUFFER_SIZE = 8
@@ -94,6 +95,12 @@ func Wrap(db *leveldb.DB, config *Config) *DB {
 	return ret
 }
 
+func (db *DB) getRange(key []byte) int {
+	hasher := fnv.New64()
+	hasher.Write(key)
+	return int(hasher.Sum64()) % len(db.requests)
+}
+
 // TODO: Make sure this is threadsafe
 func (db *DB) Close() error {
 	db.closed = true
@@ -103,32 +110,96 @@ func (db *DB) Close() error {
 	return db.db.Close()
 }
 
-func (db *DB) getRange(key []byte) int {
-	hasher := fnv.New64()
-	hasher.Write(key)
-	return int(hasher.Sum64()) % len(db.requests)
+func (db *DB) wrapOperation(key []byte, f func(db *leveldb.DB) (interface{}, error)) doRet {
+	idx := db.getRange(key)
+	result := make(chan doRet, 1)
+	db.requests[idx] <- req{
+		r:  result,
+		do: f,
+	}
+	ret := <-result
+	return ret
 }
 
 func (db *DB) Get(key []byte, ro *opt.ReadOptions) (value []byte, err error) {
 	if db.closed {
 		return nil, fmt.Errorf("Get(): db is already closed")
 	}
-	idx := db.getRange(key)
-	result := make(chan doRet, 1)
-	db.requests[idx] <- req{
-		r: result,
-		do: func(db *leveldb.DB) (interface{}, error) {
-			val, er := db.Get(key, ro)
-			return interface{}(val), er
-		},
-	}
+	ret := db.wrapOperation(key, func(db *leveldb.DB) (interface{}, error) {
+		val, er := db.Get(key, ro)
+		return interface{}(val), er
+	})
 
-	ret := <-result
 	value = ret.i.([]byte)
 	err = ret.e
 	return
 }
 
+func (db *DB) Delete(key []byte, wo *opt.WriteOptions) error {
+	if db.closed {
+		return fmt.Errorf("Get(): db is already closed")
+	}
+	ret := db.wrapOperation(key, func(db *leveldb.DB) (interface{}, error) {
+		er := db.Delete(key, wo)
+		return nil, er
+	})
+
+	return ret.e
+}
+
+func (db *DB) Has(key []byte, ro *opt.ReadOptions) (ret bool, err error) {
+	if db.closed {
+		return false, fmt.Errorf("Has(): db is already closed")
+	}
+	r := db.wrapOperation(key, func(db *leveldb.DB) (interface{}, error) {
+		bl, er := db.Has(key, ro)
+		return interface{}(bl), er
+	})
+
+	ret = r.i.(bool)
+	err = r.e
+	return
+}
+
+func (db *DB) Put(key, value []byte, wo *opt.WriteOptions) error {
+	if db.closed {
+		return fmt.Errorf("Has(): db is already closed")
+	}
+	ret := db.wrapOperation(key, func(db *leveldb.DB) (interface{}, error) {
+		er := db.Put(key, value, wo)
+		return nil, er
+	})
+
+	return ret.e
+}
+
 type Tx struct {
 	key string
+	db  *DB
+}
+
+func (db *DB) AtomicallyDo(key []byte, f func(tx *Tx) (interface{}, error)) (interface{}, error) {
+	panic("unimplemented!")
+}
+
+// Wrappers for all the functions at a normal DB has (and that we can guarantee
+// to be safe to run)
+func (db *DB) CompactRange(r util.Range) error {
+	return db.db.CompactRange(r)
+}
+
+func (db *DB) GetProperty(name string) (string, error) {
+	return db.GetProperty(name)
+}
+
+func (db *DB) GetSnapshot() (*leveldb.Snapshot, error) {
+	return db.GetSnapshot()
+}
+
+func (db *DB) SetReadOnly() error {
+	return db.SetReadOnly()
+}
+
+func (db *DB) SizeOf(ranges []util.Range) (leveldb.Sizes, error) {
+	return db.SizeOf(ranges)
 }
