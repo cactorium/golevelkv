@@ -1,5 +1,6 @@
 package atomicgoleveldb
 
+import "bytes"
 import "fmt"
 import "hash/fnv"
 
@@ -173,12 +174,53 @@ func (db *DB) Put(key, value []byte, wo *opt.WriteOptions) error {
 	return ret.e
 }
 
+func (db *DB) CAS(key, value []byte, old []byte, ro *opt.ReadOptions, wo *opt.WriteOptions) (swapped bool, err error) {
+	if db.closed {
+		return false, fmt.Errorf("Has(): db is already closed")
+	}
+	ret := db.wrapOperation(key, func(db *leveldb.DB) (interface{}, error) {
+		val, e := db.Get(key, ro)
+		if e != nil {
+			return interface{}(false), e
+		}
+		if bytes.Equal(val, old) {
+			if er := db.Put(key, value, wo); er != nil {
+				return interface{}(false), er
+			}
+			return true, nil
+		} else {
+			return false, nil
+		}
+	})
+
+	swapped = ret.i.(bool)
+	err = ret.e
+	return
+}
+
 type Tx struct {
-	key string
+	key []byte
 	db  *DB
 }
 
+func (tx *Tx) Get(ro *opt.ReadOptions) ([]byte, error) {
+	return tx.db.Get(tx.key, ro)
+}
+
+func (tx *Tx) Set(value []byte, wo *opt.WriteOptions) error {
+	return tx.db.Put(tx.key, value, wo)
+}
+
+func (tx *Tx) Has(ro *opt.ReadOptions) (bool, error) {
+	return tx.db.Has(tx.key, ro)
+}
+
+func (tx *Tx) Delete(wo *opt.WriteOptions) error {
+	return tx.db.Delete(tx.key, wo)
+}
+
 func (db *DB) AtomicallyDo(key []byte, f func(tx *Tx) (interface{}, error)) (interface{}, error) {
+	// TODO
 	panic("unimplemented!")
 }
 
