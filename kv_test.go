@@ -3,6 +3,7 @@ package levelkv
 import "bytes"
 import "fmt"
 import "os"
+import "strconv"
 import "testing"
 
 import "github.com/syndtr/goleveldb/leveldb"
@@ -206,7 +207,7 @@ func TestCas2(t *testing.T) {
 	if casErr != nil {
 		t.Fatalf("Database cas failed: %v\n", casErr)
 	}
-	if bytes.Compare(cas, testVal2) != 0 {
+	if bytes.Compare(cas, testVal) == 0 {
 		t.Fatalf("Database cas failed to swap")
 	}
 
@@ -232,5 +233,65 @@ func TestCas2(t *testing.T) {
 	}
 	if bytes.Compare(getVal3, testVal2) != 0 {
 		t.Errorf("Database get received %v instead of %v\n", getVal3, testVal2)
+	}
+}
+
+func TestMultiCas2(t *testing.T) {
+	testKey, testVal := []byte("apples"), []byte(strconv.Itoa(0))
+	putErr := db.Put(testKey, testVal, nil)
+	if putErr != nil {
+		t.Fatalf("Database put failed: %v\n", putErr)
+	}
+
+	getVal, getErr := db.Get(testKey, nil)
+	if getErr != nil {
+		t.Fatalf("Database get failed: %v\n", getErr)
+	}
+	if bytes.Compare(getVal, testVal) != 0 {
+		t.Errorf("Database get received %v instead of %v\n", getVal, testVal)
+	}
+
+	nRoutines := 4
+	nIters := 5000
+	finished := make(chan bool, nRoutines)
+	for r := 0; r < nRoutines; r++ {
+		go func() {
+			defer func() { finished <- true }()
+			lastSeenVal := 0
+			for i := 0; i < nIters; i++ {
+				success := false
+				for !success {
+					oldVal := []byte(strconv.Itoa(lastSeenVal))
+					newVal := []byte(strconv.Itoa(lastSeenVal + 1))
+					cas, casErr := db.Cas2(testKey, newVal, oldVal, nil, nil)
+					if casErr != nil {
+						t.Fatalf("Database cas failed: %v\n", casErr)
+						return
+					}
+					if bytes.Compare(cas, newVal) == 0 {
+						success = true
+					}
+					newLastVal, convErr := strconv.Atoi(string(cas))
+					if convErr != nil {
+						t.Fatalf("Database value could not be read: %v\n", convErr)
+						return
+					}
+					lastSeenVal = newLastVal
+				}
+			}
+		}()
+	}
+
+	for r := 0; r < nRoutines; r++ {
+		_ = <-finished
+	}
+
+	getVal2, getErr2 := db.Get(testKey, nil)
+	expected := []byte(strconv.Itoa(nRoutines * nIters))
+	if getErr2 != nil {
+		t.Fatalf("Database get failed: %v\n", getErr2)
+	}
+	if bytes.Compare(getVal2, expected) != 0 {
+		t.Errorf("Database get received %v instead of %v\n", string(getVal2), string(expected))
 	}
 }

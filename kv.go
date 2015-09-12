@@ -176,7 +176,7 @@ func (db *DB) Put(key, value []byte, wo *opt.WriteOptions) error {
 
 func (db *DB) Cas(key, value []byte, old []byte, ro *opt.ReadOptions, wo *opt.WriteOptions) (swapped bool, err error) {
 	if db.closed {
-		return false, fmt.Errorf("Has(): db is already closed")
+		return false, fmt.Errorf("Cas(): db is already closed")
 	}
 	ret := db.wrapOperation(key, func(db *leveldb.DB) (interface{}, error) {
 		val, e := db.Get(key, ro)
@@ -200,7 +200,7 @@ func (db *DB) Cas(key, value []byte, old []byte, ro *opt.ReadOptions, wo *opt.Wr
 
 func (db *DB) Cas2(key, value []byte, old []byte, ro *opt.ReadOptions, wo *opt.WriteOptions) (retStr []byte, err error) {
 	if db.closed {
-		return nil, fmt.Errorf("Has(): db is already closed")
+		return nil, fmt.Errorf("Cas2(): db is already closed")
 	}
 	ret := db.wrapOperation(key, func(db *leveldb.DB) (interface{}, error) {
 		val, e := db.Get(key, ro)
