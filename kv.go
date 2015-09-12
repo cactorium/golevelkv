@@ -1,4 +1,4 @@
-package levelkv
+package golevelkv
 
 import "bytes"
 import "fmt"

@@ -1,4 +1,4 @@
-package levelkv
+package golevelkv
 
 import "sync/atomic"
 import "bytes"
