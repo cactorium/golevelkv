@@ -16,3 +16,4 @@ scalability (and awesomeness)
 - 100% test coverage
 - Benchmark performance
 - Build a Raft-distributed layer on top of this (will be in a different repository)
+- Allow for more sophisticated operations (serializable transactions covering several keys)
