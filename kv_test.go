@@ -74,8 +74,6 @@ func TestMultiPutGet(t *testing.T) {
 	testVal2 := []byte("oranges")
 
 	// Interlace requests between the two go routines
-	sync := make(chan bool, 1)
-	// sync <- true
 	finished := make(chan bool, 2)
 	go func() {
 		for i := 0; i < 1000; i++ {
@@ -83,9 +81,6 @@ func TestMultiPutGet(t *testing.T) {
 			if putErr != nil {
 				t.Fatalf("Database put failed: %v\n", putErr)
 			}
-
-			sync <- true
-			_ = <-sync
 
 			getVal, getErr := db.Get(testKey, nil)
 			if getErr != nil {
@@ -105,8 +100,6 @@ func TestMultiPutGet(t *testing.T) {
 				t.Fatalf("Database put failed: %v\n", putErr2)
 			}
 
-			sync <- true
-			_ = <-sync
 			getVal2, getErr2 := db.Get(testKey, nil)
 			if getErr2 != nil {
 				t.Fatalf("Database get failed: %v\n", getErr2)
