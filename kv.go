@@ -11,6 +11,8 @@ import "github.com/syndtr/goleveldb/leveldb/util"
 const DEFAULT_NUM_BUCKETS = 16
 const DEFAULT_BUFFER_SIZE = 8
 
+// The configuration defines how many buckets and how big each bucket's channel
+// will be. These affect the overhead and scalability of the database.
 type Config struct {
 	nBuckets uint
 	bufferSz uint
