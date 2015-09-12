@@ -1,4 +1,4 @@
-# LevelKV
+# GoLevelKV
 An embeddable key-value store built on top of goleveldb to provide compare-and-swap
 operations and key-based transactions!
 
