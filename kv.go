@@ -72,7 +72,7 @@ func Wrap(db *leveldb.DB, config *Config) *DB {
 		ret.requests = append(ret.requests, make(chan req, config.BufferSize()))
 	}
 
-	for i, _ := range ret.requests {
+	for n, _ := range ret.requests {
 		go func(idx int) {
 			reqs := ret.requests[idx]
 			for {
@@ -83,7 +83,7 @@ func Wrap(db *leveldb.DB, config *Config) *DB {
 					e: err,
 				}
 			}
-		}(i)
+		}(n)
 	}
 
 	go func() {
@@ -181,7 +181,7 @@ func (db *DB) Cas(key, value []byte, old []byte, ro *opt.ReadOptions, wo *opt.Wr
 	ret := db.wrapOperation(key, func(db *leveldb.DB) (interface{}, error) {
 		val, e := db.Get(key, ro)
 		if e != nil {
-			return interface{}(false), e
+			return false, e
 		}
 		if bytes.Equal(val, old) {
 			if er := db.Put(key, value, wo); er != nil {
@@ -198,26 +198,32 @@ func (db *DB) Cas(key, value []byte, old []byte, ro *opt.ReadOptions, wo *opt.Wr
 	return
 }
 
-func (db *DB) Cas2(key, value []byte, old []byte, ro *opt.ReadOptions, wo *opt.WriteOptions) (retStr []byte, err error) {
-	if db.closed {
-		return nil, fmt.Errorf("Cas2(): db is already closed")
+func (db *DB) Cas2(key, value []byte, old []byte, ro *opt.ReadOptions, wo *opt.WriteOptions) (retStr []byte, swapped bool, err error) {
+	type cas2ret struct {
+		bs []byte
+		b  bool
 	}
-	ret := db.wrapOperation(key, func(db *leveldb.DB) (interface{}, error) {
-		val, e := db.Get(key, ro)
+	if db.closed {
+		return nil, false, fmt.Errorf("Cas2(): db is already closed")
+	}
+	ret := db.wrapOperation(key, func(d *leveldb.DB) (interface{}, error) {
+		val, e := d.Get(key, ro)
 		if e != nil {
 			return val, e
 		}
 		if bytes.Equal(val, old) {
-			if er := db.Put(key, value, wo); er != nil {
-				return val, er
+			if er := d.Put(key, value, wo); er != nil {
+				return &cas2ret{val, false}, er
 			}
-			return value, nil
+			return &cas2ret{value, true}, nil
 		} else {
-			return val, nil
+			return &cas2ret{val, false}, nil
 		}
 	})
 
-	retStr = ret.i.([]byte)
+	r := ret.i.(*cas2ret)
+	retStr = r.bs
+	swapped = r.b
 	err = ret.e
 	return
 }

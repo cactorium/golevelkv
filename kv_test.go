@@ -1,5 +1,6 @@
 package levelkv
 
+import "sync/atomic"
 import "bytes"
 import "fmt"
 import "os"
@@ -7,6 +8,7 @@ import "strconv"
 import "testing"
 
 import "github.com/syndtr/goleveldb/leveldb"
+
 import "github.com/syndtr/goleveldb/leveldb/storage"
 
 var db *DB
@@ -203,11 +205,14 @@ func TestCas2(t *testing.T) {
 	}
 
 	testVal2 := []byte("oranges")
-	cas, casErr := db.Cas2(testKey, testVal2, testVal, nil, nil)
+	cas, casb, casErr := db.Cas2(testKey, testVal2, testVal, nil, nil)
 	if casErr != nil {
 		t.Fatalf("Database cas failed: %v\n", casErr)
 	}
 	if bytes.Compare(cas, testVal) == 0 {
+		t.Fatalf("Database cas failed to swap")
+	}
+	if !casb {
 		t.Fatalf("Database cas failed to swap")
 	}
 
@@ -219,11 +224,14 @@ func TestCas2(t *testing.T) {
 		t.Errorf("Database get received %v instead of %v\n", getVal2, testVal2)
 	}
 
-	cas2, casErr2 := db.Cas2(testKey, testVal2, testVal, nil, nil)
+	cas2, cas2b, casErr2 := db.Cas2(testKey, testVal2, testVal, nil, nil)
 	if casErr2 != nil {
 		t.Fatalf("Database cas failed: %v\n", casErr2)
 	}
 	if bytes.Compare(cas2, testVal2) != 0 {
+		t.Fatalf("Database cas should have failed")
+	}
+	if cas2b {
 		t.Fatalf("Database cas should have failed")
 	}
 
@@ -251,25 +259,31 @@ func TestMultiCas2(t *testing.T) {
 		t.Errorf("Database get received %v instead of %v\n", getVal, testVal)
 	}
 
+	ops := uint64(0)
 	nRoutines := 4
-	nIters := 5000
+	nIters := 1000
 	finished := make(chan bool, nRoutines)
 	for r := 0; r < nRoutines; r++ {
-		go func() {
+		go func(n int) {
 			defer func() { finished <- true }()
 			lastSeenVal := 0
+
 			for i := 0; i < nIters; i++ {
 				success := false
 				for !success {
+					id := atomic.AddUint64(&ops, 1)
 					oldVal := []byte(strconv.Itoa(lastSeenVal))
 					newVal := []byte(strconv.Itoa(lastSeenVal + 1))
-					cas, casErr := db.Cas2(testKey, newVal, oldVal, nil, nil)
+					cas, casSuccess, casErr := db.Cas2(testKey, newVal, oldVal, nil, nil)
 					if casErr != nil {
 						t.Fatalf("Database cas failed: %v\n", casErr)
 						return
 					}
-					if bytes.Compare(cas, newVal) == 0 {
+					if casSuccess {
+						t.Logf("%v,%v,%v: %v => %v\n", n, i, id, string(oldVal), string(newVal))
 						success = true
+					} else {
+						t.Logf("%v,%v,%v: CAS failed", n, i, id)
 					}
 					newLastVal, convErr := strconv.Atoi(string(cas))
 					if convErr != nil {
@@ -279,7 +293,7 @@ func TestMultiCas2(t *testing.T) {
 					lastSeenVal = newLastVal
 				}
 			}
-		}()
+		}(r)
 	}
 
 	for r := 0; r < nRoutines; r++ {
@@ -294,4 +308,7 @@ func TestMultiCas2(t *testing.T) {
 	if bytes.Compare(getVal2, expected) != 0 {
 		t.Errorf("Database get received %v instead of %v\n", string(getVal2), string(expected))
 	}
+}
+
+func TestRange(t *testing.T) {
 }
