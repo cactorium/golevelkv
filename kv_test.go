@@ -323,8 +323,25 @@ func TestTx(t *testing.T) {
 		if e != nil {
 			return nil, e
 		}
-		if e2 := tx.Set(testVal2, nil); e2 != nil {
-			return nil, e
+		if has, e2 := tx.Has(nil); e2 != nil || !has {
+			if e2 != nil {
+				return nil, e2
+			} else {
+				return nil, fmt.Errorf("Database has returned false when true was expected\n")
+			}
+		}
+		if e3 := tx.Delete(nil); e3 != nil {
+			return nil, e3
+		}
+		if has, e4 := tx.Has(nil); e4 != nil || has {
+			if e4 != nil {
+				return nil, e4
+			} else {
+				return nil, fmt.Errorf("Database has returned true when false was expected\n")
+			}
+		}
+		if e5 := tx.Set(testVal2, nil); e5 != nil {
+			return nil, e5
 		}
 		return ret, nil
 	})
@@ -343,5 +360,4 @@ func TestTx(t *testing.T) {
 	if bytes.Compare(getVal2, testVal2) != 0 {
 		t.Errorf("Database get received %v instead of %v\n", getVal2, testVal2)
 	}
-
 }
