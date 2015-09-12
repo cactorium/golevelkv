@@ -99,7 +99,7 @@ func Wrap(db *leveldb.DB, config *Config) *DB {
 func (db *DB) getRange(key []byte) int {
 	hasher := fnv.New64()
 	hasher.Write(key)
-	return int(hasher.Sum64()) % len(db.requests)
+	return int(uint(hasher.Sum64()) % uint(len(db.requests)))
 }
 
 // TODO: Make sure this is threadsafe
