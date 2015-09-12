@@ -1,4 +1,4 @@
-package atomicgoleveldb
+package levelkv
 
 import "bytes"
 import "fmt"
@@ -200,7 +200,7 @@ func (db *DB) CAS(key, value []byte, old []byte, ro *opt.ReadOptions, wo *opt.Wr
 
 type Tx struct {
 	key []byte
-	db  *DB
+	db  *leveldb.DB
 }
 
 func (tx *Tx) Get(ro *opt.ReadOptions) ([]byte, error) {
@@ -219,9 +219,15 @@ func (tx *Tx) Delete(wo *opt.WriteOptions) error {
 	return tx.db.Delete(tx.key, wo)
 }
 
-func (db *DB) AtomicallyDo(key []byte, f func(tx *Tx) (interface{}, error)) (interface{}, error) {
-	// TODO
-	panic("unimplemented!")
+func (db *DB) AtomicallyDo(key []byte, f func(*Tx) (interface{}, error)) (interface{}, error) {
+	ret := db.wrapOperation(key, func(levelDb *leveldb.DB) (interface{}, error) {
+		tx := Tx{
+			key: key,
+			db:  levelDb,
+		}
+		return f(&tx)
+	})
+	return ret.i, ret.e
 }
 
 // Wrappers for all the functions at a normal DB has (and that we can guarantee
