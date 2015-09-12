@@ -310,5 +310,38 @@ func TestMultiCas2(t *testing.T) {
 	}
 }
 
-func TestRange(t *testing.T) {
+func TestTx(t *testing.T) {
+	testKey, testVal := []byte("apples"), []byte("bananas")
+	testVal2 := []byte("oranges")
+	putErr := db.Put(testKey, testVal, nil)
+	if putErr != nil {
+		t.Fatalf("Database put failed: %v\n", putErr)
+	}
+
+	txVal, txErr := db.Do(testKey, func(tx *Tx) (interface{}, error) {
+		ret, e := tx.Get(nil)
+		if e != nil {
+			return nil, e
+		}
+		if e2 := tx.Set(testVal2, nil); e2 != nil {
+			return nil, e
+		}
+		return ret, nil
+	})
+
+	if txErr != nil {
+		t.Fatalf("Database get failed: %v\n", txErr)
+	}
+	if bytes.Compare(txVal.([]byte), testVal) != 0 {
+		t.Errorf("Database get received %v instead of %v\n", txVal, testVal)
+	}
+
+	getVal2, getErr2 := db.Get(testKey, nil)
+	if getErr2 != nil {
+		t.Fatalf("Database get failed: %v\n", getErr2)
+	}
+	if bytes.Compare(getVal2, testVal2) != 0 {
+		t.Errorf("Database get received %v instead of %v\n", getVal2, testVal2)
+	}
+
 }
