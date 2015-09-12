@@ -114,3 +114,33 @@ func TestMultiPutGet(t *testing.T) {
 	_ = <-finished
 	_ = <-finished
 }
+
+func TestPutHasDelete(t *testing.T) {
+	testKey, testVal := []byte("bananas"), []byte("monkeys")
+	putErr := db.Put(testKey, testVal, nil)
+	if putErr != nil {
+		t.Fatalf("Database put failed: %v\n", putErr)
+	}
+
+	has, hasErr := db.Has(testKey, nil)
+	if hasErr != nil {
+		t.Fatalf("Database has failed: %v\n", hasErr)
+	}
+	if !has {
+		t.Fatal("Database does not have a value for a key it just stored")
+	}
+
+	delErr := db.Delete(testKey, nil)
+	if delErr != nil {
+		t.Fatalf("Database delete failed: %v\n", delErr)
+	}
+
+	has2, hasErr2 := db.Has(testKey, nil)
+	if hasErr2 != nil {
+		t.Fatalf("Database has failed: %v\n", hasErr2)
+	}
+	if has2 {
+		t.Fatal("Database has a value for a key it just deleted")
+	}
+
+}
