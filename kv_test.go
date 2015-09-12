@@ -142,5 +142,95 @@ func TestPutHasDelete(t *testing.T) {
 	if has2 {
 		t.Fatal("Database has a value for a key it just deleted")
 	}
+}
 
+func TestCas(t *testing.T) {
+	testKey, testVal := []byte("apples2"), []byte("bananas")
+	putErr := db.Put(testKey, testVal, nil)
+	if putErr != nil {
+		t.Fatalf("Database put failed: %v\n", putErr)
+	}
+
+	getVal, getErr := db.Get(testKey, nil)
+	if getErr != nil {
+		t.Fatalf("Database get failed: %v\n", getErr)
+	}
+	if bytes.Compare(getVal, testVal) != 0 {
+		t.Errorf("Database get received %v instead of %v\n", getVal, testVal)
+	}
+
+	testVal2 := []byte("oranges")
+	casSuccess, casErr := db.Cas(testKey, testVal2, testVal, nil, nil)
+	if casErr != nil {
+		t.Fatalf("Database cas failed: %v\n", casErr)
+	}
+	if !casSuccess {
+		t.Fatalf("Database cas failed to swap")
+	}
+
+	getVal2, getErr2 := db.Get(testKey, nil)
+	if getErr2 != nil {
+		t.Fatalf("Database get failed: %v\n", getErr2)
+	}
+	if bytes.Compare(getVal2, testVal2) != 0 {
+		t.Errorf("Database get received %v instead of %v\n", getVal2, testVal2)
+	}
+
+	casSuccess2, casErr2 := db.Cas(testKey, testVal2, testVal, nil, nil)
+	if casErr2 != nil {
+		t.Fatalf("Database cas failed: %v\n", casErr2)
+	}
+	if casSuccess2 {
+		t.Fatalf("Database cas should have failed")
+	}
+
+}
+
+func TestCas2(t *testing.T) {
+	testKey, testVal := []byte("apples"), []byte("bananas")
+	putErr := db.Put(testKey, testVal, nil)
+	if putErr != nil {
+		t.Fatalf("Database put failed: %v\n", putErr)
+	}
+
+	getVal, getErr := db.Get(testKey, nil)
+	if getErr != nil {
+		t.Fatalf("Database get failed: %v\n", getErr)
+	}
+	if bytes.Compare(getVal, testVal) != 0 {
+		t.Errorf("Database get received %v instead of %v\n", getVal, testVal)
+	}
+
+	testVal2 := []byte("oranges")
+	cas, casErr := db.Cas2(testKey, testVal2, testVal, nil, nil)
+	if casErr != nil {
+		t.Fatalf("Database cas failed: %v\n", casErr)
+	}
+	if bytes.Compare(cas, testVal2) != 0 {
+		t.Fatalf("Database cas failed to swap")
+	}
+
+	getVal2, getErr2 := db.Get(testKey, nil)
+	if getErr2 != nil {
+		t.Fatalf("Database get failed: %v\n", getErr2)
+	}
+	if bytes.Compare(getVal2, testVal2) != 0 {
+		t.Errorf("Database get received %v instead of %v\n", getVal2, testVal2)
+	}
+
+	cas2, casErr2 := db.Cas2(testKey, testVal2, testVal, nil, nil)
+	if casErr2 != nil {
+		t.Fatalf("Database cas failed: %v\n", casErr2)
+	}
+	if bytes.Compare(cas2, testVal2) != 0 {
+		t.Fatalf("Database cas should have failed")
+	}
+
+	getVal3, getErr3 := db.Get(testKey, nil)
+	if getErr3 != nil {
+		t.Fatalf("Database get failed: %v\n", getErr3)
+	}
+	if bytes.Compare(getVal3, testVal2) != 0 {
+		t.Errorf("Database get received %v instead of %v\n", getVal3, testVal2)
+	}
 }

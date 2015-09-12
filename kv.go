@@ -174,7 +174,7 @@ func (db *DB) Put(key, value []byte, wo *opt.WriteOptions) error {
 	return ret.e
 }
 
-func (db *DB) CAS(key, value []byte, old []byte, ro *opt.ReadOptions, wo *opt.WriteOptions) (swapped bool, err error) {
+func (db *DB) Cas(key, value []byte, old []byte, ro *opt.ReadOptions, wo *opt.WriteOptions) (swapped bool, err error) {
 	if db.closed {
 		return false, fmt.Errorf("Has(): db is already closed")
 	}
@@ -194,6 +194,30 @@ func (db *DB) CAS(key, value []byte, old []byte, ro *opt.ReadOptions, wo *opt.Wr
 	})
 
 	swapped = ret.i.(bool)
+	err = ret.e
+	return
+}
+
+func (db *DB) Cas2(key, value []byte, old []byte, ro *opt.ReadOptions, wo *opt.WriteOptions) (retStr []byte, err error) {
+	if db.closed {
+		return nil, fmt.Errorf("Has(): db is already closed")
+	}
+	ret := db.wrapOperation(key, func(db *leveldb.DB) (interface{}, error) {
+		val, e := db.Get(key, ro)
+		if e != nil {
+			return val, e
+		}
+		if bytes.Equal(val, old) {
+			if er := db.Put(key, value, wo); er != nil {
+				return val, er
+			}
+			return value, nil
+		} else {
+			return val, nil
+		}
+	})
+
+	retStr = ret.i.([]byte)
 	err = ret.e
 	return
 }
@@ -219,7 +243,7 @@ func (tx *Tx) Delete(wo *opt.WriteOptions) error {
 	return tx.db.Delete(tx.key, wo)
 }
 
-func (db *DB) AtomicallyDo(key []byte, f func(*Tx) (interface{}, error)) (interface{}, error) {
+func (db *DB) Do(key []byte, f func(*Tx) (interface{}, error)) (interface{}, error) {
 	ret := db.wrapOperation(key, func(levelDb *leveldb.DB) (interface{}, error) {
 		tx := Tx{
 			key: key,
