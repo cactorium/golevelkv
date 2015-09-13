@@ -64,6 +64,9 @@ type DB struct {
 }
 
 func Wrap(db *leveldb.DB, config *Config) *DB {
+	if config == nil {
+		config = NewConfig()
+	}
 	ret := &DB{
 		db:       db,
 		requests: make([]chan req, 0, config.NumBuckets()),
@@ -78,7 +81,10 @@ func Wrap(db *leveldb.DB, config *Config) *DB {
 		go func(idx int) {
 			reqs := ret.requests[idx]
 			for {
-				req := <-reqs
+				req, ok := <-reqs
+				if !ok {
+					break
+				}
 				result, err := req.do(ret.db)
 				req.r <- doRet{
 					i: result,

@@ -1,14 +1,16 @@
 package golevelkv
 
-import "sync/atomic"
 import "bytes"
 import "fmt"
 import "os"
+import "runtime"
 import "strconv"
+import "sync/atomic"
 import "testing"
 
 import "github.com/syndtr/goleveldb/leveldb"
-
+import "github.com/syndtr/goleveldb/leveldb/filter"
+import "github.com/syndtr/goleveldb/leveldb/opt"
 import "github.com/syndtr/goleveldb/leveldb/storage"
 
 var db *DB
@@ -359,5 +361,199 @@ func TestTx(t *testing.T) {
 	}
 	if bytes.Compare(getVal2, testVal2) != 0 {
 		t.Errorf("Database get received %v instead of %v\n", getVal2, testVal2)
+	}
+}
+
+func BenchmarkLevelPutMulti(b *testing.B) {
+	o := &opt.Options{
+		Filter: filter.NewBloomFilter(10),
+	}
+	d, err := leveldb.OpenFile("./levelkv_test.db", o)
+	if err != nil {
+		panic("Unable to open database")
+	}
+	kv := Wrap(d, NewConfig())
+	defer kv.Close()
+
+	numRoutines := runtime.NumCPU()
+	finished := make(chan bool, numRoutines)
+	for j := 0; j < numRoutines; j++ {
+		go func(n int) {
+			key := []byte("keyaaaa")
+			key[2] = 'a' + byte(n)
+			for i := 0; i < b.N/numRoutines; i++ {
+				kv.Put(key, []byte("value"), nil)
+				key[0]++
+				if key[0] == '0' {
+					key[1]++
+				}
+			}
+			finished <- true
+		}(j)
+	}
+
+	for j := 0; j < numRoutines; j++ {
+		<-finished
+	}
+}
+
+func BenchmarkLevelPutSingleKey(b *testing.B) {
+	o := &opt.Options{
+		Filter: filter.NewBloomFilter(10),
+	}
+	db2, err := leveldb.OpenFile("./leveldb_test.db2", o)
+	if err != nil {
+		panic("Unable to open database")
+	}
+	kv := Wrap(db2, NewConfig())
+	defer kv.Close()
+
+	numRoutines := runtime.NumCPU()
+	finished := make(chan bool, numRoutines)
+	for j := 0; j < numRoutines; j++ {
+		go func(n int) {
+			key := []byte("keyaaaa")
+			for i := 0; i < b.N/numRoutines; i++ {
+				kv.Put(key, []byte("value"), nil)
+			}
+			finished <- true
+		}(j)
+	}
+
+	for j := 0; j < numRoutines; j++ {
+		<-finished
+	}
+}
+
+func BenchmarkLevelGet(b *testing.B) {
+	o := &opt.Options{
+		Filter: filter.NewBloomFilter(10),
+	}
+	db2, err := leveldb.OpenFile("./leveldb_test.db2", o)
+	if err != nil {
+		panic("Unable to open database")
+	}
+	kv := Wrap(db2, NewConfig())
+	defer kv.Close()
+
+	key := []byte("keyaaaa")
+	for i := 0; i < b.N; i++ {
+		kv.Get(key, nil)
+		key[0]++
+		if key[0] == '0' {
+			key[1]++
+		}
+	}
+}
+
+func BenchmarkLevelGetSingleKey(b *testing.B) {
+	o := &opt.Options{
+		Filter: filter.NewBloomFilter(10),
+	}
+	db2, err := leveldb.OpenFile("./leveldb_test.db2", o)
+	if err != nil {
+		panic("Unable to open database")
+	}
+	kv := Wrap(db2, NewConfig())
+	defer kv.Close()
+
+	key := []byte("keyaaaa")
+	for i := 0; i < b.N; i++ {
+		kv.Get(key, nil)
+	}
+}
+
+func BenchmarkLevelGetMulti(b *testing.B) {
+	o := &opt.Options{
+		Filter: filter.NewBloomFilter(10),
+	}
+	db2, err := leveldb.OpenFile("./leveldb_test.db2", o)
+	if err != nil {
+		panic("Unable to open database")
+	}
+	kv := Wrap(db2, NewConfig())
+	defer kv.Close()
+
+	numRoutines := runtime.NumCPU()
+	finished := make(chan bool, numRoutines)
+	for j := 0; j < numRoutines; j++ {
+		go func(n int) {
+			key := []byte("keyaaaa")
+			key[2] = 'a' + byte(n)
+			for i := 0; i < b.N/numRoutines; i++ {
+				kv.Get(key, nil)
+				key[0]++
+				if key[0] == '0' {
+					key[1]++
+				}
+			}
+			finished <- true
+		}(j)
+	}
+
+	for j := 0; j < numRoutines; j++ {
+		<-finished
+	}
+}
+
+func BenchmarkLevelGetSingle(b *testing.B) {
+	o := &opt.Options{
+		Filter: filter.NewBloomFilter(10),
+	}
+	db2, err := leveldb.OpenFile("./leveldb_test.db2", o)
+	if err != nil {
+		panic("Unable to open database")
+	}
+	kv := Wrap(db2, NewConfig())
+	defer kv.Close()
+
+	numRoutines := runtime.NumCPU()
+	finished := make(chan bool, numRoutines)
+	for j := 0; j < numRoutines; j++ {
+		go func(n int) {
+			key := []byte("keyaaaa")
+			for i := 0; i < b.N/numRoutines; i++ {
+				kv.Get(key, nil)
+			}
+			finished <- true
+		}(j)
+	}
+
+	for j := 0; j < numRoutines; j++ {
+		<-finished
+	}
+}
+
+func BenchmarkLevelGetPut(b *testing.B) {
+	o := &opt.Options{
+		Filter: filter.NewBloomFilter(10),
+	}
+	db2, err := leveldb.OpenFile("./leveldb_test.db2", o)
+	if err != nil {
+		panic("Unable to open database")
+	}
+	kv := Wrap(db2, NewConfig())
+	defer kv.Close()
+
+	numRoutines := runtime.NumCPU()
+	finished := make(chan bool, numRoutines)
+	for j := 0; j < numRoutines; j++ {
+		go func(n int) {
+			key := []byte("keyaaaa")
+			key[2] = 'a' + byte(n)
+			for i := 0; i < b.N/numRoutines; i++ {
+				kv.Put(key, []byte("value"), nil)
+				kv.Get(key, nil)
+				key[0]++
+				if key[0] == '0' {
+					key[1]++
+				}
+			}
+			finished <- true
+		}(j)
+	}
+
+	for j := 0; j < numRoutines; j++ {
+		<-finished
 	}
 }
