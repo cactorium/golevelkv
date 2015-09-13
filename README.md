@@ -1,4 +1,4 @@
-# GoLevelKV
+# GoLevelKV [![Build Status](https://travis-ci.org/cactorium/golevelkv.svg)](https://travis-ci.org/cactorium/golevelkv) 
 An embeddable key-value store built on top of goleveldb to provide compare-and-swap
 operations and key-based transactions!
 

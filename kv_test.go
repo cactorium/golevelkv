@@ -5,7 +5,8 @@ import "fmt"
 import "os"
 import "runtime"
 import "strconv"
-import "sync/atomic"
+
+//import "sync/atomic"
 import "testing"
 
 import "github.com/syndtr/goleveldb/leveldb"
@@ -261,7 +262,7 @@ func TestMultiCas2(t *testing.T) {
 		t.Errorf("Database get received %v instead of %v\n", getVal, testVal)
 	}
 
-	ops := uint64(0)
+	//ops := uint64(0)
 	nRoutines := 4
 	nIters := 1000
 	finished := make(chan bool, nRoutines)
@@ -273,7 +274,7 @@ func TestMultiCas2(t *testing.T) {
 			for i := 0; i < nIters; i++ {
 				success := false
 				for !success {
-					id := atomic.AddUint64(&ops, 1)
+					//id := atomic.AddUint64(&ops, 1)
 					oldVal := []byte(strconv.Itoa(lastSeenVal))
 					newVal := []byte(strconv.Itoa(lastSeenVal + 1))
 					cas, casSuccess, casErr := db.Cas2(testKey, newVal, oldVal, nil, nil)
@@ -282,10 +283,10 @@ func TestMultiCas2(t *testing.T) {
 						return
 					}
 					if casSuccess {
-						t.Logf("%v,%v,%v: %v => %v\n", n, i, id, string(oldVal), string(newVal))
+						//t.Logf("%v,%v,%v: %v => %v\n", n, i, id, string(oldVal), string(newVal))
 						success = true
 					} else {
-						t.Logf("%v,%v,%v: CAS failed", n, i, id)
+						//t.Logf("%v,%v,%v: CAS failed", n, i, id)
 					}
 					newLastVal, convErr := strconv.Atoi(string(cas))
 					if convErr != nil {
